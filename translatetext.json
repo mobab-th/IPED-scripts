@@ -1,0 +1,28 @@
+{
+    "host" : "http://your-translation.server",
+    "port" : 5000,
+    "api_key" : "your API KEY",
+    "target_language" : "de",
+    "maxChars" : 10000,
+    "comment" : "maxChars = 0 -> process the whole text",
+    "categories" : [
+                    "Scanned Documents",
+                    "Emails",
+                    "Spreadsheets",
+                    "RTF Documents",
+                    "PDF Documents",
+                    "HTML Documents",
+                    "Text Documents",
+                    "Other Documents",
+                    "WhatsApp",
+                    "Messenger",
+                    "Skype",
+                    "Telegram",
+                    "Jabber",
+                    "Facebook",
+                    "Instagram",
+                    "Discord",
+                    "Chat Activities",
+                    "Others Chats"
+                    ]
+}
