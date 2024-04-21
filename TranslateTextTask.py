@@ -1,4 +1,4 @@
-﻿# Python task script example. It must be installed in TaskInstaller.xml to be executed.
+# Python task script example. It must be installed in TaskInstaller.xml to be executed.
 # On Linux, you need to install jep (pip install jep) and include jep.so in LD_LIBRARY_PATH.
 # see https://github.com/sepinf-inc/IPED/wiki/User-Manual#python-modules
 
@@ -6,6 +6,7 @@ import requests
 import logging
 import os
 import json
+from sys import argv, stderr, exit
 
 '''
 Description
@@ -105,19 +106,24 @@ class TranslateTextTask:
                     'format' : 'text',
                     'api_key': api_key
                     }
-                response = requests.post(url=url, headers=headers, data=data)
-                if response.status_code == 200:
-                    US_TMP = eval(response.text)
-                    UEBERSETZUNG = US_TMP.get('translatedText')
-                    #meta_data.set("text\:translated", "1")
-                    item.setExtraAttribute("translated", True)
-                    logging.info("Text translated from item %s of media type %s with hash %s", item_name, media_type, hash)
-                    logging.info("set new SubItem for item %s" , item_name)
-                    newSubItem(self, item, UEBERSETZUNG, subItemID)
-                    subItemID += 1
-                else:
-                    logging.info("Error: Text not translated from item %s of media type %s with hash %s", item_name, media_type, hash)
-                    item.setExtraAttribute("translation_error", response.text)
+                try:
+                    response = requests.post(url=url, headers=headers, data=data)
+                    if response.status_code == 200:
+                        US_TMP = eval(response.text)
+                        UEBERSETZUNG = US_TMP.get('translatedText')
+                        #meta_data.set("text\:translated", "1")
+                        item.setExtraAttribute("translated", True)
+                        logging.info("Text translated from item %s of media type %s with hash %s", item_name, media_type, hash)
+                        logging.info("set new SubItem for item %s" , item_name)
+                        newSubItem(self, item, UEBERSETZUNG, subItemID)
+                        subItemID += 1
+                    else:
+                        logging.info("Error: Text not translated from item %s of media type %s with hash %s", item_name, media_type, hash)
+                        item.setExtraAttribute("translated", False)
+                        item.setExtraAttribute("translation_error", response.text)
+                except Exception as err:
+                    item.setExtraAttribute("translated", False)
+                    item.setExtraAttribute("translation_error", str(err))
 
 
 def newSubItem(self, item, text, subItemID):
