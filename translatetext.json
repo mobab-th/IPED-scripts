@@ -4,11 +4,12 @@
     "api_key" : "your API KEY",
     "target_language" : "de",
     "maxChars" : 10000,
-    "comment" : "maxChars = 0 -> process the whole text",
+    "comment_maxChars" : "maxChars = 0 -> process the whole text",
+    "minChars" : 100,
+    "comment_minChars" : "translate only if the text have a set of minimum chars",
     "categories" : [
-                    "Scanned Documents",
                     "Emails",
-                    "RTF Documents",
+                    "Scanned Documents",
                     "PDF Documents",
                     "Text Documents",
                     "Other Documents",
@@ -24,3 +25,4 @@
                     "Others Chats"
                     ]
 }
+
