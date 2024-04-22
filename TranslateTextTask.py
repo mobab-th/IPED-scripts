@@ -73,6 +73,7 @@ class TranslateTextTask:
         api_key = TranslateTextTask.config.get('api_key')
         target_language = TranslateTextTask.config.get('target_language')
         maxChars = TranslateTextTask.config.get('maxChars')
+        minChars = TranslateTextTask.config.get('minChars')
         categories = TranslateTextTask.config.get('categories')
 
         url = '%s:%s/translate' % ( host, port)
@@ -95,39 +96,53 @@ class TranslateTextTask:
         # Only processing, if item in allowed categories, source lang not target lang and not already translated and not known by hash
         if item.getCategories() in categories and src_lang != target_language and 'known' not in HashDB_Status:
             if item.getParsedTextCache() is not None:
-                if maxChars > 0:
-                    Text2Translate = item.getParsedTextCache()[0:maxChars]
-                else:
-                    Text2Translate = item.getParsedTextCache()
-                data = {
-                    'q' : Text2Translate,
-                    'source': 'auto',
-                    'target': target_language,
-                    'format' : 'text',
-                    'api_key': api_key
-                    }
-                try:
-                    response = requests.post(url=url, headers=headers, data=data)
-                    if response.status_code == 200:
-                        US_TMP = eval(response.text)
-                        UEBERSETZUNG = US_TMP.get('translatedText')
-                        #meta_data.set("text\:translated", "1")
-                        item.setExtraAttribute("translated", True)
-                        logging.info("Text translated from item %s of media type %s with hash %s", item_name, media_type, hash)
-                        logging.info("set new SubItem for item %s" , item_name)
-                        newSubItem(self, item, UEBERSETZUNG, subItemID)
-                        subItemID += 1
+                if  len(item.getParsedTextCache()) > minChars:
+                    if maxChars > 0:
+                        Text2Translate = item.getParsedTextCache()[0:maxChars]
                     else:
-                        logging.info("Error: Text not translated from item %s of media type %s with hash %s", item_name, media_type, hash)
+                        Text2Translate = item.getParsedTextCache()
+                    data = {
+                        'q' : Text2Translate,
+                        'source': 'auto',
+                        'target': target_language,
+                        'format' : 'text',
+                        'api_key': api_key
+                        }
+                    try:
+                        response = requests.post(url=url, headers=headers, data=data)
+                        if response.status_code == 200:
+                            US_TMP = eval(response.text)
+                            if len(item.getParsedTextCache()) > maxChars and maxChars > 0:
+                                UEBERSETZUNG = '%s\n\n%s' % ( str(US_TMP.get('translatedText')) , 'HINT: Translation stopped in case of configured limit')
+                                fullTranslation = False
+                            else:
+                                UEBERSETZUNG = str(US_TMP.get('translatedText'))
+                                fullTranslation = True
+                            item.setExtraAttribute("translated", True)
+                            item.setExtraAttribute("translatedAll", fullTranslation)
+                            item.setExtraAttribute("translatedText", UEBERSETZUNG)
+                            logging.info("Text translated from item %s of media type %s with hash %s", item_name, media_type, hash)
+                            logging.info("set new SubItem for item %s" , item_name)
+                            newSubItem(self, item, UEBERSETZUNG, subItemID)
+                            subItemID += 1
+                        else:
+                            logging.error("Error: Text not translated from item %s of media type %s with hash %s", item_name, media_type, hash)
+                            item.setExtraAttribute("translated", False)
+                            item.setExtraAttribute("translation_error", response.text)
+                    except Exception as err:
                         item.setExtraAttribute("translated", False)
-                        item.setExtraAttribute("translation_error", response.text)
-                except Exception as err:
+                        item.setExtraAttribute("translation_error", str(err))
+                        logging.error("Error: Text not translated from item %s: %s", item_name, str(err))
+                else:
+                    logging.info("Text not translated from item %s in case of to few characters", item_name)
                     item.setExtraAttribute("translated", False)
-                    item.setExtraAttribute("translation_error", str(err))
-
 
 def newSubItem(self, item, text, subItemID):
     from iped.engine.data import Item
+    from iped.engine.task import ExportFileTask
+    from org.apache.commons.lang3 import StringUtils
+    from java.io import ByteArrayInputStream
+    from iped.engine.core import Statistics
 
     newItem = Item()
     newItem.setParent(item)
@@ -136,18 +151,15 @@ def newSubItem(self, item, text, subItemID):
     newItem.setSubItem(True)
     newItem.setSubitemId(subItemID)
     newItem.setSumVolume(False);
+    try:
+        # export item content to case storage
+        exporter = ExportFileTask();
+        exporter.setWorker(worker);
+        bytes = StringUtils.getBytes(text, 'UTF-8')
+        dataStream = ByteArrayInputStream(bytes);
+        exporter.extractFile(dataStream, newItem, item.getLength());
+        Statistics.get().incSubitemsDiscovered();
+        worker.processNewItem(newItem);
+    except Exception as err:
+        logging.error("set new SubItem for item %s failed" , item_name)
 
-    # export item content to case storage
-    from iped.engine.task import ExportFileTask
-    from org.apache.commons.lang3 import StringUtils
-    from java.io import ByteArrayInputStream
-    exporter = ExportFileTask();
-    exporter.setWorker(worker);
-    bytes = StringUtils.getBytes(text, 'UTF-8')
-    dataStream = ByteArrayInputStream(bytes);
-    exporter.extractFile(dataStream, newItem, item.getLength());
-
-    from iped.engine.core import Statistics
-    Statistics.get().incSubitemsDiscovered();
-
-    worker.processNewItem(newItem);
