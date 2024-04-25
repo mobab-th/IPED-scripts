@@ -1,4 +1,4 @@
-# Python task script example. It must be installed in TaskInstaller.xml to be executed.
+﻿# Python task script example. It must be installed in TaskInstaller.xml to be executed.
 # On Linux, you need to install jep (pip install jep) and include jep.so in LD_LIBRARY_PATH.
 # see https://github.com/sepinf-inc/IPED/wiki/User-Manual#python-modules
 
@@ -18,9 +18,14 @@ Description
 Changelog
 2024-04-21
     - first Release
+2024-04-23
+    - prevent infinite loops if the translation delivers a text that is not actually in the target language
+    - setExtraAttribute "translatedAll" (True/False) as an indication that the translation was stopped due to the configuration
+    - some more info & error logging
 '''
 
 configFile = 'translatetext.json'
+#enableProp = 'enableTranslateText'
 
 logging.basicConfig(format='%(asctime)s [%(levelname)s] [TranslateTextTask.py] %(message)s', level=logging.DEBUG)
 # The main class name must be equal to the script file name without .py extension
@@ -28,11 +33,13 @@ logging.basicConfig(format='%(asctime)s [%(levelname)s] [TranslateTextTask.py] %
 class TranslateTextTask:
 
     config = None
-    # Returns if this task is enabled or not. This could access options read by init() method.
+    #enabled = False
+
     def isEnabled(self):
         return True
+        #return TranslateTextTask.enabled
 
-    # Returns an optional list of configurable objects that can load/save parameters from/to config files. 
+    # Returns an optional list of configurable objects that can load/save parameters from/to config files.
     def getConfigurables(self):
         return []
 
@@ -48,8 +55,8 @@ class TranslateTextTask:
         with open(os.path.join(ipedRoot, 'conf', configFile)) as f:
             TranslateTextTask.config = json.load(f)
         return
-    
-    
+
+
     # Finish method run after processing all items in case, e.g. to clean resources.
     # It is executed by each processing thread on its class instance.
     # Objects "ipedCase" and "searcher" are provided, so case can be queried for items and bookmarks can be created, for example.
@@ -57,7 +64,7 @@ class TranslateTextTask:
     def finish(self):
         return
 
-    
+
     # Process an Item object.
 
     def process(self, item):
@@ -94,7 +101,9 @@ class TranslateTextTask:
         else:
             src_lang= "??"
         # Only processing, if item in allowed categories, source lang not target lang and not already translated and not known by hash
-        if item.getCategories() in categories and src_lang != target_language and 'known' not in HashDB_Status:
+        #print('vor übersetzung\nKategorie %s\nTextsprache %s\nHAshDB-Status %s' % (str(item.getCategories()), str(src_lang), str(HashDB_Status)))
+        if item.getCategories() in categories and src_lang != target_language and 'known' not in HashDB_Status and not item.getExtraAttribute("translatedAutomatically"):
+            #print('in Übersetzung')
             if item.getParsedTextCache() is not None:
                 if  len(item.getParsedTextCache()) > minChars:
                     if maxChars > 0:
@@ -150,6 +159,9 @@ def newSubItem(self, item, text, subItemID):
     newItem.setPath(item.getPath() + ">>" + newItem.getName())
     newItem.setSubItem(True)
     newItem.setSubitemId(subItemID)
+    # Set this attribute to prevent infinite loops
+    # if the translation delivers a text that is not actually in the target language
+    newItem.setExtraAttribute("translatedAutomatically", True)
     newItem.setSumVolume(False);
     try:
         # export item content to case storage
@@ -162,4 +174,3 @@ def newSubItem(self, item, text, subItemID):
         worker.processNewItem(newItem);
     except Exception as err:
         logging.error("set new SubItem for item %s failed" , item_name)
-
